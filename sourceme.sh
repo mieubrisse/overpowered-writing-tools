@@ -37,7 +37,7 @@ find_post() {
         return 1
     fi
 
-    vim post.md
+    ${EDITOR} post.md
 }
 
 new_post() {
@@ -54,5 +54,5 @@ new_post() {
     fi
 
     cd "${new_post_dirpath}"
-    "${EDITOR}" post.md
+    ${EDITOR} post.md
 }

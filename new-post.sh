@@ -54,8 +54,18 @@ if git rev-parse --verify "${post_name}" &> /dev/null; then
     exit 1
 fi
 
-if ! git checkout main; then
+if ! cd "${WRITING_REPO_DIRPATH}"; then
+    echo "Error: Couldn't cd to writing repo: ${WRITING_REPO_DIRPATH}" >&2
+    exit 1
+fi
+
+if ! git checkout main >/dev/null; then
     echo "Error: Couldn't check out main branch" >&2
+    exit 1
+fi
+
+if ! git checkout -b "${post_name}" >/dev/null; then
+    echo "Error: Failed to check out new branch: ${post_name}" >&2
     exit 1
 fi
 
@@ -64,22 +74,17 @@ if ! cp -R "${TEMPLATE_DIRNAME}" "${post_name}"; then
     exit 1
 fi
 
-if ! git checkout -b "${post_name}"; then
-    echo "Error: Failed to check out new branch: ${post_name}" >&2
-    exit 1
-fi
-
 if ! cd "${post_name}"; then
     echo "Error: Couldn't cd to new directory: ${post_name}" >&2
     exit 1
 fi
 
-if ! git add .; then
+if ! git add . >/dev/null; then
     echo "Error: Failed to add new files" >&2
     exit 1
 fi
 
-if ! git commit -m "Initial commit for ${post_name}"; then
+if ! git commit -m "Initial commit for ${post_name}" >/dev/null; then
     echo "Error: Failed to commit new files" >&2
     exit 1
 fi
