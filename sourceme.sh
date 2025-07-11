@@ -1,9 +1,7 @@
 _WRITING_TOOLS_DIRPATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _FIND_POST_SCRIPTNAME="find-post.sh"
+_NEW_POST_SCRIPTNAME="new-post.sh"
 
-# Opens in Vim a post inside the given blog post repo
-# Expects the first argument to be the post repo
-# You'll likely want to add an alias for this in your .bashrc
 find_post() {
     if [ -z "${WRITING_REPO_DIRPATH}" ]; then
         echo "Error: WRITING_REPO_DIRPATH var must point to your writing repo" >&2
@@ -42,4 +40,19 @@ find_post() {
     vim post.md
 }
 
-# TODO new_post
+new_post() {
+    if [ -z "${WRITING_REPO_DIRPATH}" ]; then
+        echo "Error: WRITING_REPO_DIRPATH var must point to your writing repo" >&2
+        return 1
+    fi
+
+    if ! new_post_dirpath="$(
+        bash "${_WRITING_TOOLS_DIRPATH}/${_NEW_POST_SCRIPTNAME}" "${WRITING_REPO_DIRPATH}" "${@}"
+    )"; then
+        echo "Error: ${_NEW_POST_SCRIPTNAME} failed" >&2
+        return 1
+    fi
+
+    cd "${new_post_dirpath}"
+    "${EDITOR}" post.md
+}

@@ -5,7 +5,7 @@ set -euo pipefail
 script_dirpath="$(cd "$(dirname "${0}")" && pwd)"
 
 usage() {
-    echo "Usage: ${0} writing_repo_dirpath query_term1 [query_term2]..." >&2
+    echo "Usage: ${0} writing_repo_dirpath [query_term1] [query_term2]..." >&2
 }
 
 if [ "${#}" -eq 0 ]; then
