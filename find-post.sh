@@ -20,12 +20,8 @@ if [ -z "${writing_repo_dirpath}" ]; then
     exit 1
 fi
 
+# Search terms can be empty; user will fill it in interactively
 search_terms="${*}"
-if [ -z "${search_terms}" ]; then
-    echo "Error: at least one search term must be provided" >&2
-    usage
-    exit 1
-fi
 
 # Use associative arrays to store our data to get O(1) lookup times
 declare -A seen_dirs
