@@ -1,12 +1,8 @@
-Writing Tools
-=============
-This repository is for people who manage a writing repo in Markdown format.
+Overpowered Writing Tools
+=========================
+This repository provides a collection of tools to manage the writing repository described in An Overpowered Writing System (TODO LINK).
 
-<!-- TODO link to An Overpowered Writing System -->
-
-It contains tools to keep you writing at the speed of thought.
-
-It expects a repo in this format:
+It expects a writing repo in the Overpowered Writing System format:
 
 ```
 TEMPLATE/
@@ -26,12 +22,12 @@ Installation
 ------------
 1. Clone this repo:
    ```
-   git clone git@github.com:mieubrisse/writing-tools.git
+   git clone git@github.com:mieubrisse/overpowered-writing-tools.git
    ```
 1. Add the following to your `.bashrc`/`.zshrc`, replacing the `TODO`s with the appropriate values:
    ```
    export WRITING_REPO_DIRPATH=/TODO/your/writing/repo/path
-   source /TODO/clone/location/of/writing-tools/sourceme.sh
+   source /TODO/clone/location/of/overpowered-writing-tools/sourceme.sh
    ```
 1. (Optional) set up aliases as you please:
    ```
