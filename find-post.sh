@@ -1,3 +1,5 @@
+set -x 
+
 # This script presents the user with the possible posts (directories) that could be
 # switched to across all branches, allows the user to pick one with fzf, and 
 # allows the user to 
@@ -38,11 +40,28 @@ while IFS="" read -r file; do
     fi
 done < <(git -C "${writing_repo_dirpath}" ls-tree -r --name-only main | grep '/post\.md$')
 
-# Get all branches at once and process them
-branches=($(git -C "${writing_repo_dirpath}" branch --format='%(refname:short)' --no-merged main))
+# Get all branches and sort them by commit distance from main (using batch processing)
+declare -a sorted_branches
+branches_list=($(git -C "${writing_repo_dirpath}" branch --format='%(refname:short)' --no-merged main))
 
-# Process all branches using git show instead of ls-tree
-for branch in "${branches[@]}"; do
+# Build a single git command to get all distances at once
+if [ ${#branches_list[@]} -gt 0 ]; then
+    # Create a format string for git for-each-ref that includes distance calculation
+    while IFS= read -r line; do
+        sorted_branches+=("${line#* }")
+    done < <(
+        # Use git for-each-ref with parallel processing to get distances
+        git -C "${writing_repo_dirpath}" for-each-ref --format='%(refname:short)' refs/heads/ | \
+        grep -v '^main$' | \
+        xargs -P 0 -I {} sh -c 'distance=$(git -C "'"${writing_repo_dirpath}"'" rev-list --count "main..{}" 2>/dev/null || echo "999999"); echo "$distance {}"' | \
+        sort -n
+    )
+else
+    sorted_branches=()
+fi
+
+# Process all branches using git ls-tree to get all files in each branch
+for branch in "${sorted_branches[@]}"; do
     while IFS= read -r file; do
         dir=$(dirname "$file")
         if [[ -z "${seen_dirs[$dir]:-}" ]]; then
@@ -50,7 +69,7 @@ for branch in "${branches[@]}"; do
             branch_mapping["$dir"]="$branch"
             seen_dirs["$dir"]=1
         fi
-    done < <(git -C "${writing_repo_dirpath}" show --name-only --pretty=format: "refs/heads/$branch" | grep '/post\.md$')
+    done < <(git -C "${writing_repo_dirpath}" ls-tree -r --name-only "$branch" | grep '/post\.md$')
 done
 
 # Sort entries by last commit date (most recent first) - optimized version
