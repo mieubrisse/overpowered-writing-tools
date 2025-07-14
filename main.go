@@ -41,8 +41,16 @@ and allow interactive selection with fzf.`,
 	RunE: findPosts,
 }
 
+var shellCmd = &cobra.Command{
+	Use:   "shell",
+	Short: "Output shell functions for integration",
+	Long:  "Generate shell functions that can be sourced to integrate opwriting with your shell",
+	RunE:  shellIntegration,
+}
+
 func main() {
 	rootCmd.AddCommand(findCmd)
+	rootCmd.AddCommand(shellCmd)
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %+v\n", err)
 		os.Exit(1)
@@ -108,16 +116,6 @@ func findPosts(cmd *cobra.Command, args []string) error {
 		return stacktrace.Propagate(err, "failed to sort entries by commit date")
 	}
 
-	// Debug: print entries found
-	fmt.Fprintf(os.Stderr, "Found %d entries:\n", len(sortedEntries))
-	for i, entry := range sortedEntries {
-		fmt.Fprintf(os.Stderr, "%d: %s (branch: %s)\n", i+1, entry, branchMapping[entry])
-		if i >= 4 { // Show first 5 entries
-			fmt.Fprintf(os.Stderr, "... and %d more\n", len(sortedEntries)-5)
-			break
-		}
-	}
-
 	// Launch fzf for selection
 	selection, err := runFzf(sortedEntries, searchTerms)
 	if err != nil {
@@ -125,7 +123,7 @@ func findPosts(cmd *cobra.Command, args []string) error {
 	}
 
 	if selection == "" {
-		return nil // User cancelled
+		os.Exit(2) // User cancelled - exit with status 2
 	}
 
 	// Look up the branch for this selection
@@ -305,12 +303,59 @@ func runFzf(entries []string, query string) (string, error) {
 	
 	// Wait for command to complete
 	if err := cmd.Wait(); err != nil {
-		// fzf returns exit code 1 when user cancels, which is normal
-		if exitError, ok := err.(*exec.ExitError); ok && exitError.ExitCode() == 1 {
+		// fzf returns exit code 1 when user cancels with ESC, exit code 130 when user cancels with Ctrl+C
+		if exitError, ok := err.(*exec.ExitError); ok && (exitError.ExitCode() == 1 || exitError.ExitCode() == 130) {
 			return "", nil // User cancelled
 		}
 		return "", stacktrace.Propagate(err, "fzf execution failed")
 	}
 	
 	return strings.TrimSpace(output), nil
+}
+
+func shellIntegration(cmd *cobra.Command, args []string) error {
+	shellFunction := `find_post() {
+    if [ -z "${WRITING_REPO_DIRPATH}" ]; then
+        echo "Error: WRITING_REPO_DIRPATH var must point to your writing repo" >&2
+        return 1
+    fi
+
+    find_post_output="$(opwriting find "${WRITING_REPO_DIRPATH}" "${@}")"
+    find_post_exit_code=$?
+    
+    if [ $find_post_exit_code -eq 2 ]; then
+        # User cancelled - exit silently
+        return 2
+    elif [ $find_post_exit_code -ne 0 ]; then
+        echo "Error: opwriting find failed" >&2
+        return 1
+    fi
+
+    read -r post_branch post_directory < <(echo "${find_post_output}")
+    if [ -z "${post_branch}" ]; then
+        echo "Error: opwriting find returned an empty branch" >&2
+        return 1
+    fi
+    if [ -z "${post_directory}" ]; then
+        echo "Error: opwriting find returned an empty directory" >&2
+        return 1
+    fi
+
+    cd "${WRITING_REPO_DIRPATH}"
+
+    if ! git checkout "${post_branch}"; then
+        echo "Error: An error occurred checking out branch '${post_branch}'" >&2
+        return 1
+    fi
+
+    if ! cd "${post_directory}"; then
+        echo "Error: Failed to check out post directory '${post_directory}'" >&2
+        return 1
+    fi
+
+    ${EDITOR} post.md
+}`
+
+	fmt.Println(shellFunction)
+	return nil
 }
