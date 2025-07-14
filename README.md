@@ -24,20 +24,20 @@ Installation
    ```
    git clone git@github.com:mieubrisse/overpowered-writing-tools.git
    ```
+1. Build the `opwriting` binary:
+   ```
+   bash build.sh
+   ```
 1. Add the following to your `.bashrc`/`.zshrc`, replacing the `TODO`s with the appropriate values:
    ```
-   export WRITING_REPO_DIRPATH=/TODO/your/writing/repo/path
-   source /TODO/clone/location/of/overpowered-writing-tools/sourceme.sh
-   ```
-1. (Optional) set up aliases as you please:
-   ```
-   alias pf="find_post"
-   alias pn="new_post"
+   export WRITING_REPO_DIRPATH=/TODO/your/overpowered/writing/repo/path  # Where you have your post directories
+   export PATH=/where/you/checked/out/overpowered-writing-tools/build    # Build directory containing the 'opwriting' binary
+   eval "$(opwriting shell)"
    ```
 
 Usage
 -----
-The `sourceme.sh` file makes two functions available, which you may consider aliasing:
+The `eval "$(opwriting shell)"` makes the following two functions available. You might consider aliasing them (e.g. I use `alias pf="find_post"` and `alias pn="new_post"`).
 
 ### find_post
 `find_post [search_term] [search_term2]..` will:
