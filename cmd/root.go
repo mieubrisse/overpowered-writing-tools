@@ -22,5 +22,6 @@ func Execute() {
 
 func init() {
 	rootCmd.AddCommand(findCmd)
+	rootCmd.AddCommand(addCmd)
 	rootCmd.AddCommand(shellCmd)
 }
