@@ -94,10 +94,27 @@ func findPosts(cmd *cobra.Command, args []string) error {
 		return stacktrace.Propagate(err, "failed to sort entries by commit date")
 	}
 
-	// Launch fzf for selection
-	selection, err := runFzf(sortedEntries, searchTerms)
-	if err != nil {
-		return stacktrace.Propagate(err, "fzf selection failed")
+	// Filter entries based on search terms if provided
+	var filteredEntries []string
+	if searchTerms != "" {
+		filteredEntries, err = filterEntriesBySearchTerms(sortedEntries, searchTerms)
+		if err != nil {
+			return stacktrace.Propagate(err, "failed to filter entries by search terms")
+		}
+	} else {
+		filteredEntries = sortedEntries
+	}
+
+	// If exactly one match, skip fzf and use it directly
+	var selection string
+	if len(filteredEntries) == 1 {
+		selection = filteredEntries[0]
+	} else {
+		// Launch fzf for selection
+		selection, err = runFzf(filteredEntries, searchTerms)
+		if err != nil {
+			return stacktrace.Propagate(err, "fzf selection failed")
+		}
 	}
 
 	if selection == "" {
@@ -289,4 +306,42 @@ func runFzf(entries []string, query string) (string, error) {
 	}
 	
 	return strings.TrimSpace(output), nil
+}
+
+func filterEntriesBySearchTerms(entries []string, searchTerms string) ([]string, error) {
+	if searchTerms == "" {
+		return entries, nil
+	}
+
+	// Split search terms by spaces and build regex pattern
+	terms := strings.Fields(searchTerms)
+	if len(terms) == 0 {
+		return entries, nil
+	}
+
+	// Build regex pattern: .*term1.*term2.*term3.*
+	patternParts := make([]string, 0, len(terms)*2+1)
+	patternParts = append(patternParts, ".*")
+	for _, term := range terms {
+		// Escape special regex characters in the search term
+		escapedTerm := regexp.QuoteMeta(term)
+		patternParts = append(patternParts, escapedTerm, ".*")
+	}
+	pattern := strings.Join(patternParts, "")
+
+	// Compile regex (case insensitive)
+	regex, err := regexp.Compile("(?i)" + pattern)
+	if err != nil {
+		return nil, stacktrace.Propagate(err, "failed to compile search regex: %s", pattern)
+	}
+
+	// Filter entries
+	var filtered []string
+	for _, entry := range entries {
+		if regex.MatchString(entry) {
+			filtered = append(filtered, entry)
+		}
+	}
+
+	return filtered, nil
 }
