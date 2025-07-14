@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"bytes"
+	"embed"
 	"fmt"
 	"os"
 	"os/exec"
@@ -11,10 +13,14 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"text/template"
 
 	"github.com/kurtosis-tech/stacktrace"
 	"github.com/spf13/cobra"
 )
+
+//go:embed shell-integration.sh.tmpl
+var shellTemplateFS embed.FS
 
 type PostEntry struct {
 	Dir    string
@@ -314,48 +320,28 @@ func runFzf(entries []string, query string) (string, error) {
 }
 
 func shellIntegration(cmd *cobra.Command, args []string) error {
-	shellFunction := `find_post() {
-    if [ -z "${WRITING_REPO_DIRPATH}" ]; then
-        echo "Error: WRITING_REPO_DIRPATH var must point to your writing repo" >&2
-        return 1
-    fi
+	// Read the shell template
+	templateContent, err := shellTemplateFS.ReadFile("shell-integration.sh.tmpl")
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to read shell template")
+	}
 
-    find_post_output="$(opwriting find "${WRITING_REPO_DIRPATH}" "${@}")"
-    find_post_exit_code=$?
-    
-    if [ $find_post_exit_code -eq 2 ]; then
-        # User cancelled - exit silently
-        return 2
-    elif [ $find_post_exit_code -ne 0 ]; then
-        echo "Error: opwriting find failed" >&2
-        return 1
-    fi
+	// Parse and execute the template
+	tmpl, err := template.New("shell").Parse(string(templateContent))
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to parse shell template")
+	}
 
-    read -r post_branch post_directory < <(echo "${find_post_output}")
-    if [ -z "${post_branch}" ]; then
-        echo "Error: opwriting find returned an empty branch" >&2
-        return 1
-    fi
-    if [ -z "${post_directory}" ]; then
-        echo "Error: opwriting find returned an empty directory" >&2
-        return 1
-    fi
+	var buf bytes.Buffer
+	err = tmpl.Execute(&buf, struct {
+		BinaryName string
+	}{
+		BinaryName: "opwriting",
+	})
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to execute shell template")
+	}
 
-    cd "${WRITING_REPO_DIRPATH}"
-
-    if ! git checkout "${post_branch}"; then
-        echo "Error: An error occurred checking out branch '${post_branch}'" >&2
-        return 1
-    fi
-
-    if ! cd "${post_directory}"; then
-        echo "Error: Failed to check out post directory '${post_directory}'" >&2
-        return 1
-    fi
-
-    ${EDITOR} post.md
-}`
-
-	fmt.Println(shellFunction)
+	fmt.Print(buf.String())
 	return nil
 }

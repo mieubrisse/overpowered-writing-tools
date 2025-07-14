@@ -1,0 +1,41 @@
+find_post() {
+    if [ -z "${WRITING_REPO_DIRPATH}" ]; then
+        echo "Error: WRITING_REPO_DIRPATH var must point to your writing repo" >&2
+        return 1
+    fi
+
+    find_post_output="$({{.BinaryName}} find "${WRITING_REPO_DIRPATH}" "${@}")"
+    find_post_exit_code=$?
+    
+    if [ $find_post_exit_code -eq 2 ]; then
+        # User cancelled - exit silently
+        return 2
+    elif [ $find_post_exit_code -ne 0 ]; then
+        echo "Error: {{.BinaryName}} find failed" >&2
+        return 1
+    fi
+
+    read -r post_branch post_directory < <(echo "${find_post_output}")
+    if [ -z "${post_branch}" ]; then
+        echo "Error: {{.BinaryName}} find returned an empty branch" >&2
+        return 1
+    fi
+    if [ -z "${post_directory}" ]; then
+        echo "Error: {{.BinaryName}} find returned an empty directory" >&2
+        return 1
+    fi
+
+    cd "${WRITING_REPO_DIRPATH}"
+
+    if ! git checkout "${post_branch}"; then
+        echo "Error: An error occurred checking out branch '${post_branch}'" >&2
+        return 1
+    fi
+
+    if ! cd "${post_directory}"; then
+        echo "Error: Failed to check out post directory '${post_directory}'" >&2
+        return 1
+    fi
+
+    ${EDITOR} post.md
+}
