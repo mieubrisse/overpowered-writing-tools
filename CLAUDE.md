@@ -1,1 +1,4 @@
-To understand what this project is, read the README.md.
+To understand what this project is, first read the README.md.
+
+Also know:
+- Builds are created in the `build` directory
