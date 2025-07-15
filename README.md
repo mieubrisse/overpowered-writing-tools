@@ -20,19 +20,13 @@ some-other-post/
 
 Installation
 ------------
-1. Clone this repo:
-   ```
-   git clone git@github.com:mieubrisse/overpowered-writing-tools.git
-   ```
-1. Build the `opwriting` binary:
-   ```
-   bash build.sh
-   ```
+1. Download the appropriate binary for your OS/arch from [the releases page](https://github.com/mieubrisse/overpowered-writing-tools/releases)
+1. Rename the binary to `opwriting` and store it somewhere on your machine
 1. Add the following to your `.bashrc`/`.zshrc`, replacing the `TODO`s with the appropriate values:
-   ```
-   export WRITING_REPO_DIRPATH=/TODO/your/overpowered/writing/repo/path  # Where you have your post directories
-   export PATH=/where/you/checked/out/overpowered-writing-tools/build    # Build directory containing the 'opwriting' binary
-   eval "$(opwriting shell)"
+   ```bash
+   export PATH=/where/your/opwriting/binary/lives  # Directory containing the 'opwriting' binary
+   export WRITING_REPO_DIRPATH=/your/writing/repo  # Your writing repo
+   eval "$(opwriting shell)"                       # Adds functions to manage the repo (see below)
    ```
 
 Usage
