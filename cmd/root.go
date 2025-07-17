@@ -11,6 +11,8 @@ var rootCmd = &cobra.Command{
 	Use:   "opwriting",
 	Short: "Overpowered writing tools",
 	Long:  "A CLI tool for managing writing repositories with post directories across Git branches",
+	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
 func Execute() {
