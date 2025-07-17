@@ -158,7 +158,7 @@ func monitorPRStatus(branch string) error {
 			
 			if status.StatusCheckRollup == "SUCCESS" {
 				fmt.Println("All checks passed! ✅")
-				return nil
+				return handleSuccessfulChecks(branch)
 			} else if status.StatusCheckRollup == "FAILURE" {
 				fmt.Println("Some checks failed ❌")
 				return stacktrace.NewError("PR checks failed")
@@ -185,4 +185,90 @@ func getPRStatus(branch string) (*PRStatus, error) {
 	}
 
 	return &statuses[0], nil
+}
+
+func handleSuccessfulChecks(branch string) error {
+	fmt.Println("Merging PR and cleaning up...")
+	
+	// Merge PR and delete remote branch
+	if err := mergePR(branch); err != nil {
+		return stacktrace.Propagate(err, "failed to merge PR")
+	}
+	
+	// Switch to main branch
+	if err := switchToMain(); err != nil {
+		return stacktrace.Propagate(err, "failed to switch to main branch")
+	}
+	
+	// Pull latest changes
+	if err := pullMain(); err != nil {
+		return stacktrace.Propagate(err, "failed to pull main branch")
+	}
+	
+	// Delete local branch
+	if err := deleteLocalBranch(branch); err != nil {
+		return stacktrace.Propagate(err, "failed to delete local branch")
+	}
+	
+	// Open post in Chrome
+	if err := openPostInChrome(branch); err != nil {
+		return stacktrace.Propagate(err, "failed to open post in Chrome")
+	}
+	
+	// Print Substack URL
+	fmt.Println("\nPaste the rendered Markdown output into:")
+	fmt.Println("https://mieubrisse.substack.com/publish/post?type=newsletter")
+	
+	return nil
+}
+
+func mergePR(branch string) error {
+	cmd := exec.Command("gh", "pr", "merge", branch, "--merge", "--delete-branch")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return stacktrace.NewError("failed to merge PR: %s", string(output))
+	}
+	fmt.Println("PR merged and remote branch deleted")
+	return nil
+}
+
+func switchToMain() error {
+	cmd := exec.Command("git", "checkout", "main")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return stacktrace.NewError("failed to checkout main: %s", string(output))
+	}
+	fmt.Println("Switched to main branch")
+	return nil
+}
+
+func pullMain() error {
+	cmd := exec.Command("git", "pull")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return stacktrace.NewError("failed to pull main: %s", string(output))
+	}
+	fmt.Println("Pulled latest changes")
+	return nil
+}
+
+func deleteLocalBranch(branch string) error {
+	cmd := exec.Command("git", "branch", "-d", branch)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return stacktrace.NewError("failed to delete local branch: %s", string(output))
+	}
+	fmt.Printf("Deleted local branch '%s'\n", branch)
+	return nil
+}
+
+func openPostInChrome(branch string) error {
+	postPath := fmt.Sprintf("%s/post.md", branch)
+	cmd := exec.Command("open", "-a", "Google Chrome", postPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return stacktrace.NewError("failed to open post in Chrome: %s", string(output))
+	}
+	fmt.Printf("Opened %s in Chrome\n", postPath)
+	return nil
 }
