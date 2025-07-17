@@ -306,8 +306,22 @@ func pullMain() error {
 }
 
 func deleteLocalBranch(branch string) error {
-	cmd := exec.Command("git", "branch", "-d", branch)
-	output, err := cmd.CombinedOutput()
+	// First check if the branch exists
+	cmd := exec.Command("git", "branch", "--list", branch)
+	output, err := cmd.Output()
+	if err != nil {
+		return stacktrace.NewError("failed to check if branch exists: %s", string(output))
+	}
+	
+	// If no output, branch doesn't exist
+	if strings.TrimSpace(string(output)) == "" {
+		fmt.Printf("Local branch '%s' already deleted\n", branch)
+		return nil
+	}
+	
+	// Branch exists, try to delete it
+	cmd = exec.Command("git", "branch", "-d", branch)
+	output, err = cmd.CombinedOutput()
 	if err != nil {
 		return stacktrace.NewError("failed to delete local branch: %s", string(output))
 	}
