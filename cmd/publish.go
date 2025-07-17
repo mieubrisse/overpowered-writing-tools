@@ -16,12 +16,29 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type PRStatus struct {
-	StatusCheckRollup string `json:"statusCheckRollup"`
+type PRStatusResponse struct {
+	CurrentBranch PRBranch `json:"currentBranch"`
+}
+
+type PRBranch struct {
+	StatusCheckRollup []StatusCheck `json:"statusCheckRollup"`
 	Reviews           []struct {
 		State string `json:"state"`
 	} `json:"reviews"`
 }
+
+type StatusCheck struct {
+	Context string `json:"context"`
+	State   string `json:"state"`
+}
+
+type PRStatusEnum int
+
+const (
+	StatusPending PRStatusEnum = iota
+	StatusSuccess
+	StatusFailure
+)
 
 var publishCmd = &cobra.Command{
 	Use:   "publish",
@@ -138,10 +155,15 @@ func monitorPRStatus(branch string) error {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
+	fmt.Println("Waiting for checks to pass (Ctrl+C to stop monitoring)...")
+
+	// Check immediately first
+	if checkPRStatusOnce(branch) {
+		return handleSuccessfulChecks(branch)
+	}
+
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-
-	fmt.Println("Waiting for checks to pass (Ctrl+C to stop monitoring)...")
 
 	for {
 		select {
@@ -149,43 +171,67 @@ func monitorPRStatus(branch string) error {
 			fmt.Println("\nMonitoring interrupted by user")
 			return nil
 		case <-ticker.C:
-			status, err := getPRStatus(branch)
-			if err != nil {
-				fmt.Printf("Error getting PR status: %v\n", err)
-				continue
-			}
-
-			fmt.Printf("Status: %s\n", status.StatusCheckRollup)
-			
-			if status.StatusCheckRollup == "SUCCESS" {
-				fmt.Println("All checks passed! ✅")
+			if checkPRStatusOnce(branch) {
 				return handleSuccessfulChecks(branch)
-			} else if status.StatusCheckRollup == "FAILURE" {
-				fmt.Println("Some checks failed ❌")
-				return stacktrace.NewError("PR checks failed")
 			}
-			// Continue monitoring for PENDING or other statuses
 		}
 	}
 }
 
-func getPRStatus(branch string) (*PRStatus, error) {
+func checkPRStatusOnce(branch string) bool {
+	status, err := getPRStatus(branch)
+	if err != nil {
+		fmt.Printf("Error getting PR status: %v\n", err)
+		return false // Continue monitoring on error
+	}
+
+	overallStatus := getOverallStatus(status.StatusCheckRollup)
+	
+	switch overallStatus {
+	case StatusSuccess:
+		fmt.Println("All checks passed! ✅")
+		return true
+	case StatusFailure:
+		fmt.Println("Some checks failed ❌")
+		return false
+	case StatusPending:
+		fmt.Println("Checks are still running...")
+		return false
+	default:
+		return false
+	}
+}
+
+func getOverallStatus(statusChecks []StatusCheck) PRStatusEnum {
+	if len(statusChecks) == 0 {
+		return StatusPending
+	}
+	
+	for _, check := range statusChecks {
+		switch check.State {
+		case "FAILURE", "ERROR":
+			return StatusFailure
+		case "PENDING":
+			return StatusPending
+		}
+	}
+	
+	return StatusSuccess
+}
+
+func getPRStatus(branch string) (*PRBranch, error) {
 	cmd := exec.Command("gh", "pr", "status", "--json", "statusCheckRollup,reviews")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to get PR status")
 	}
 
-	var statuses []PRStatus
-	if err := json.Unmarshal(output, &statuses); err != nil {
+	var statusResponse PRStatusResponse
+	if err := json.Unmarshal(output, &statusResponse); err != nil {
 		return nil, stacktrace.Propagate(err, "failed to parse PR status JSON")
 	}
 
-	if len(statuses) == 0 {
-		return nil, stacktrace.NewError("no PR status found")
-	}
-
-	return &statuses[0], nil
+	return &statusResponse.CurrentBranch, nil
 }
 
 func handleSuccessfulChecks(branch string) error {
