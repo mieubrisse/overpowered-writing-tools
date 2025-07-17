@@ -60,3 +60,13 @@ new_post() {
     cd "${new_post_dirpath}"
     ${EDITOR} post.md
 }
+
+publish_post() {
+    if [ -z "${WRITING_REPO_DIRPATH}" ]; then
+        echo "Error: WRITING_REPO_DIRPATH var must point to your writing repo" >&2
+        return 1
+    fi
+
+    cd "${WRITING_REPO_DIRPATH}"
+    {{.BinaryName}} publish
+}
