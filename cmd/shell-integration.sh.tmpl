@@ -1,4 +1,4 @@
-find_post() {
+jump_post() {
     if [ -z "${WRITING_REPO_DIRPATH}" ]; then
         echo "Error: WRITING_REPO_DIRPATH var must point to your writing repo" >&2
         return 1
@@ -36,7 +36,13 @@ find_post() {
         echo "Error: Failed to check out post directory '${post_directory}'" >&2
         return 1
     fi
+}
 
+edit_post() {
+    if ! jump_post "${@}"; then
+        return $?
+    fi
+    
     ${EDITOR} post.md
 }
 
