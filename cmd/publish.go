@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -210,8 +211,14 @@ func handleSuccessfulChecks(branch string) error {
 		return stacktrace.Propagate(err, "failed to delete local branch")
 	}
 	
+	// Find the post directory that was added in this branch
+	postDir, err := getAddedPostDirectory(branch)
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to find added post directory")
+	}
+	
 	// Open post in Chrome
-	if err := openPostInChrome(branch); err != nil {
+	if err := openPostInChrome(postDir); err != nil {
 		return stacktrace.Propagate(err, "failed to open post in Chrome")
 	}
 	
@@ -262,8 +269,40 @@ func deleteLocalBranch(branch string) error {
 	return nil
 }
 
-func openPostInChrome(branch string) error {
-	postPath := fmt.Sprintf("%s/post.md", branch)
+func getAddedPostDirectory(branch string) (string, error) {
+	// Get files that were added in this branch compared to main
+	cmd := exec.Command("git", "diff", "--name-only", "--diff-filter=A", "main...HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", stacktrace.Propagate(err, "failed to get added files")
+	}
+	
+	var addedPostDirs []string
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	for scanner.Scan() {
+		file := scanner.Text()
+		if strings.HasSuffix(file, "/post.md") {
+			dir := filepath.Dir(file)
+			// Skip TEMPLATE directory
+			if dir != "TEMPLATE" {
+				addedPostDirs = append(addedPostDirs, dir)
+			}
+		}
+	}
+	
+	if len(addedPostDirs) == 0 {
+		return "", stacktrace.NewError("no post.md files were added in this branch")
+	}
+	
+	if len(addedPostDirs) > 1 {
+		return "", stacktrace.NewError("multiple post.md files were added in this branch: %v", addedPostDirs)
+	}
+	
+	return addedPostDirs[0], nil
+}
+
+func openPostInChrome(postDir string) error {
+	postPath := fmt.Sprintf("%s/post.md", postDir)
 	cmd := exec.Command("open", "-a", "Google Chrome", postPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
