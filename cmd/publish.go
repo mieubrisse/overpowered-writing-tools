@@ -12,9 +12,14 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/kurtosis-tech/stacktrace"
 	"github.com/spf13/cobra"
 )
+
+const envFilename = ".overpowered-writing.env"
+const defaultSubstackURL = "<your Substack URL here>/post/new"
+const substackURLEnvVar = "SUBSTACK_URL"
 
 type PRStatusResponse struct {
 	CurrentBranch PRBranch `json:"currentBranch"`
@@ -234,6 +239,26 @@ func getPRStatus(branch string) (*PRBranch, error) {
 	return &statusResponse.CurrentBranch, nil
 }
 
+func getSubstackURL() string {
+	// Check if env file exists
+	if _, err := os.Stat(envFilename); os.IsNotExist(err) {
+		return defaultSubstackURL
+	}
+	
+	// Load env file using godotenv
+	envVars, err := godotenv.Read(envFilename)
+	if err != nil {
+		return defaultSubstackURL
+	}
+	
+	// Get SUBSTACK_URL from env vars
+	if url, exists := envVars[substackURLEnvVar]; exists && url != "" {
+		return url + "/publish/post?type=newsletter"
+	}
+	
+	return defaultSubstackURL
+}
+
 func handleSuccessfulChecks(branch string) error {
 	fmt.Println("Merging PR and cleaning up...")
 	
@@ -269,8 +294,14 @@ func handleSuccessfulChecks(branch string) error {
 	}
 	
 	// Print Substack URL
+	substackURL := getSubstackURL()
 	fmt.Println("\nPaste the rendered Markdown output into:")
-	fmt.Println("https://mieubrisse.substack.com/publish/post?type=newsletter")
+	fmt.Println(substackURL)
+	
+	// Show tip if using placeholder URL
+	if substackURL == defaultSubstackURL {
+		fmt.Printf("\n💡 Tip: Create a %s file with %s=https://yourname.substack.com to get a working link.\n", envFilename, substackURLEnvVar)
+	}
 	
 	return nil
 }
