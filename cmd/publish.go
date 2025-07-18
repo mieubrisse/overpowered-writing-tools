@@ -31,6 +31,7 @@ type PRBranch struct {
 	Reviews           []struct {
 		State string `json:"state"`
 	} `json:"reviews"`
+	State string `json:"state"`
 }
 
 type StatusCheck struct {
@@ -190,10 +191,16 @@ func monitorPRStatus(branch string) error {
 }
 
 func checkPRStatusOnce(branch string) bool {
-	status, err := getPRStatus(branch)
+	status, err := getPRStatus()
 	if err != nil {
 		fmt.Printf("Error getting PR status: %v\n", err)
 		return false // Continue monitoring on error
+	}
+
+	// Check if PR has been merged externally
+	if status.State == "MERGED" {
+		fmt.Println("PR has been merged externally, proceeding with cleanup...")
+		return true
 	}
 
 	if len(status.StatusCheckRollup) == 0 {
@@ -225,25 +232,9 @@ func checkPRStatusOnce(branch string) bool {
 	return allPassed
 }
 
-func getOverallStatus(statusChecks []StatusCheck) PRStatusEnum {
-	if len(statusChecks) == 0 {
-		return StatusPending
-	}
 
-	for _, check := range statusChecks {
-		switch check.State {
-		case "FAILURE", "ERROR":
-			return StatusFailure
-		case "PENDING":
-			return StatusPending
-		}
-	}
-
-	return StatusSuccess
-}
-
-func getPRStatus(branch string) (*PRBranch, error) {
-	cmd := exec.Command("gh", "pr", "status", "--json", "statusCheckRollup,reviews")
+func getPRStatus() (*PRBranch, error) {
+	cmd := exec.Command("gh", "pr", "status", "--json", "statusCheckRollup,reviews,state")
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, stacktrace.Propagate(err, "failed to get PR status")
@@ -339,7 +330,7 @@ func handleSuccessfulChecks(branch string) error {
 	}
 
 	// Find the post directory that was added in this branch
-	postDir, err := getAddedPostDirectory(branch)
+	postDir, err := getAddedPostDirectory()
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to find added post directory")
 	}
@@ -416,7 +407,7 @@ func deleteLocalBranch(branch string) error {
 	return nil
 }
 
-func getAddedPostDirectory(branch string) (string, error) {
+func getAddedPostDirectory() (string, error) {
 	// Get files that were added in this branch compared to main
 	cmd := exec.Command("git", "diff", "--name-only", "--diff-filter=A", "main...HEAD")
 	output, err := cmd.Output()
