@@ -35,9 +35,11 @@ func shellIntegration(cmd *cobra.Command, args []string) error {
 
 	var buf bytes.Buffer
 	err = tmpl.Execute(&buf, struct {
-		BinaryName string
+		BinaryName       string
+		WritingDirEnvVar string
 	}{
-		BinaryName: "opwriting",
+		BinaryName:       "opwriting",
+		WritingDirEnvVar: WritingDirEnvVar,
 	})
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to execute shell template")

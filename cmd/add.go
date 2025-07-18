@@ -18,22 +18,22 @@ const (
 )
 
 var addCmd = &cobra.Command{
-	Use:   "add [writing_repo_path] [name_words...]",
+	Use:   "add [name_words...]",
 	Short: "Create a new post directory and branch",
 	Long: `Create a new post by copying from TEMPLATE directory, creating a new Git branch,
 and committing the initial files. Name words will be joined with hyphens.`,
-	Args: cobra.MinimumNArgs(2),
+	Args: cobra.MinimumNArgs(1),
 	RunE: addPost,
 }
 
 func addPost(cmd *cobra.Command, args []string) error {
-	writingRepoPath := args[0]
-	nameWords := args[1:]
-
+	// Get writing directory from environment variable
+	writingRepoPath := os.Getenv(WritingDirEnvVar)
 	if writingRepoPath == "" {
-		return stacktrace.NewError("writing repo path cannot be empty")
+		return stacktrace.NewError("writing directory not configured: %s environment variable not set", WritingDirEnvVar)
 	}
 
+	nameWords := args
 	if len(nameWords) == 0 {
 		return stacktrace.NewError("post name must have at least one word")
 	}
