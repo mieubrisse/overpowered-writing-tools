@@ -27,21 +27,21 @@ type BranchDistance struct {
 }
 
 var findCmd = &cobra.Command{
-	Use:   "find [writing_repo_path] [search_terms...]",
+	Use:   "find [search_terms...]",
 	Short: "Find and select a post directory from any branch",
 	Long: `Find post directories across all Git branches, sorted by commit distance from main,
 and allow interactive selection with fzf.`,
-	Args: cobra.MinimumNArgs(1),
 	RunE: findPosts,
 }
 
 func findPosts(cmd *cobra.Command, args []string) error {
-	writingRepoPath := args[0]
-	searchTerms := strings.Join(args[1:], " ")
-
+	// Get writing directory from environment variable
+	writingRepoPath := os.Getenv(WritingDirEnvVar)
 	if writingRepoPath == "" {
-		return stacktrace.NewError("writing repo path cannot be empty")
+		return stacktrace.NewError("writing directory not configured: %s environment variable not set", WritingDirEnvVar)
 	}
+
+	searchTerms := strings.Join(args, " ")
 
 	// Check if the directory exists and is a git repo
 	if _, err := os.Stat(writingRepoPath); os.IsNotExist(err) {

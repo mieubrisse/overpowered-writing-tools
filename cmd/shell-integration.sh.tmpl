@@ -1,10 +1,5 @@
 jump_post() {
-    if [ -z "${{{.WritingDirEnvVar}}}" ]; then
-        echo "Error: {{.WritingDirEnvVar}} var must point to your writing repo" >&2
-        return 1
-    fi
-
-    find_post_output="$({{.BinaryName}} find "${{{.WritingDirEnvVar}}}" "${@}")"
+    find_post_output="$({{.BinaryName}} find "${@}")"
     find_post_exit_code=$?
     
     if [ $find_post_exit_code -eq 2 ]; then
@@ -25,7 +20,7 @@ jump_post() {
         return 1
     fi
 
-    cd "${{{.WritingDirEnvVar}}}"
+    cd "${WRITING_REPO_DIRPATH}"
 
     if ! git checkout "${post_branch}"; then
         echo "Error: An error occurred checking out branch '${post_branch}'" >&2
@@ -47,12 +42,7 @@ edit_post() {
 }
 
 new_post() {
-    if [ -z "${{{.WritingDirEnvVar}}}" ]; then
-        echo "Error: {{.WritingDirEnvVar}} var must point to your writing repo" >&2
-        return 1
-    fi
-
-    new_post_dirpath="$({{.BinaryName}} add "${{{.WritingDirEnvVar}}}" "${@}")"
+    new_post_dirpath="$({{.BinaryName}} add "${@}")"
     new_post_exit_code=$?
     
     if [ $new_post_exit_code -eq 2 ]; then
@@ -68,11 +58,5 @@ new_post() {
 }
 
 publish_post() {
-    if [ -z "${{{.WritingDirEnvVar}}}" ]; then
-        echo "Error: {{.WritingDirEnvVar}} var must point to your writing repo" >&2
-        return 1
-    fi
-
-    cd "${{{.WritingDirEnvVar}}}"
     {{.BinaryName}} publish
 }

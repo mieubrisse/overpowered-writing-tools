@@ -196,21 +196,33 @@ func checkPRStatusOnce(branch string) bool {
 		return false // Continue monitoring on error
 	}
 
-	overallStatus := getOverallStatus(status.StatusCheckRollup)
-
-	switch overallStatus {
-	case StatusSuccess:
-		fmt.Println("All checks passed! ✅")
-		return true
-	case StatusFailure:
-		fmt.Println("Some checks failed ❌")
-		return false
-	case StatusPending:
-		fmt.Println("Checks are still running...")
-		return false
-	default:
+	if len(status.StatusCheckRollup) == 0 {
+		fmt.Println("No status checks found, continuing to wait...")
 		return false
 	}
+
+	allPassed := true
+	hasFailure := false
+
+	for _, check := range status.StatusCheckRollup {
+		switch check.State {
+		case "SUCCESS":
+			fmt.Printf("✅ %s: %s\n", check.Context, check.State)
+		case "FAILURE", "ERROR":
+			fmt.Printf("❌ %s: %s\n", check.Context, check.State)
+			hasFailure = true
+			allPassed = false
+		default:
+			fmt.Printf("⏳ %s: %s\n", check.Context, check.State)
+			allPassed = false
+		}
+	}
+
+	if hasFailure {
+		return false
+	}
+	
+	return allPassed
 }
 
 func getOverallStatus(statusChecks []StatusCheck) PRStatusEnum {
