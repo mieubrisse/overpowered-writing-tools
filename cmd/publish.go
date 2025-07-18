@@ -17,9 +17,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const envFilename = ".overpowered-writing.env"
-const defaultSubstackURL = "<your Substack URL here>/post/new"
-const substackURLEnvVar = "SUBSTACK_URL"
+const (
+	DefaultSubstackURL = "<your Substack URL here>/post/new"
+	SubstackURLEnvVar  = "SUBSTACK_URL"
+)
 
 type PRStatusResponse struct {
 	CurrentBranch PRBranch `json:"currentBranch"`
@@ -55,6 +56,11 @@ Waits for checks to pass and can be interrupted at any time.`,
 }
 
 func publishPR(cmd *cobra.Command, args []string) error {
+	// Validate we're in the writing directory
+	if err := validateWritingDirectory(); err != nil {
+		return stacktrace.Propagate(err, "directory validation failed")
+	}
+
 	// Get current branch
 	currentBranch, err := getCurrentBranch()
 	if err != nil {
@@ -191,7 +197,7 @@ func checkPRStatusOnce(branch string) bool {
 	}
 
 	overallStatus := getOverallStatus(status.StatusCheckRollup)
-	
+
 	switch overallStatus {
 	case StatusSuccess:
 		fmt.Println("All checks passed! ✅")
@@ -211,7 +217,7 @@ func getOverallStatus(statusChecks []StatusCheck) PRStatusEnum {
 	if len(statusChecks) == 0 {
 		return StatusPending
 	}
-	
+
 	for _, check := range statusChecks {
 		switch check.State {
 		case "FAILURE", "ERROR":
@@ -220,7 +226,7 @@ func getOverallStatus(statusChecks []StatusCheck) PRStatusEnum {
 			return StatusPending
 		}
 	}
-	
+
 	return StatusSuccess
 }
 
@@ -239,70 +245,108 @@ func getPRStatus(branch string) (*PRBranch, error) {
 	return &statusResponse.CurrentBranch, nil
 }
 
+func validateWritingDirectory() error {
+	// Get current working directory
+	currentDir, err := os.Getwd()
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to get current working directory")
+	}
+
+	// Get writing directory from environment variable
+	writingDir := os.Getenv(WritingDirEnvVar)
+	if writingDir == "" {
+		return stacktrace.NewError("writing directory not configured: %s environment variable not set", WritingDirEnvVar)
+	}
+
+	// Convert to absolute paths for comparison
+	absWritingDir, err := filepath.Abs(writingDir)
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to get absolute path for writing directory")
+	}
+
+	absCurrentDir, err := filepath.Abs(currentDir)
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to get absolute path for current directory")
+	}
+
+	// Check if current directory is within writing directory
+	relPath, err := filepath.Rel(absWritingDir, absCurrentDir)
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to calculate relative path")
+	}
+
+	// If relative path starts with "..", we're outside the writing directory
+	if strings.HasPrefix(relPath, "..") {
+		return stacktrace.NewError("must run publish command from within the writing directory (%s) or one of its subdirectories", absWritingDir)
+	}
+
+	return nil
+}
+
 func getSubstackURL() string {
 	// Check if env file exists
-	if _, err := os.Stat(envFilename); os.IsNotExist(err) {
-		return defaultSubstackURL
+	if _, err := os.Stat(EnvFilename); os.IsNotExist(err) {
+		return DefaultSubstackURL
 	}
-	
+
 	// Load env file using godotenv
-	envVars, err := godotenv.Read(envFilename)
+	envVars, err := godotenv.Read(EnvFilename)
 	if err != nil {
-		return defaultSubstackURL
+		return DefaultSubstackURL
 	}
-	
+
 	// Get SUBSTACK_URL from env vars
-	if url, exists := envVars[substackURLEnvVar]; exists && url != "" {
+	if url, exists := envVars[SubstackURLEnvVar]; exists && url != "" {
 		return url + "/publish/post?type=newsletter"
 	}
-	
-	return defaultSubstackURL
+
+	return DefaultSubstackURL
 }
 
 func handleSuccessfulChecks(branch string) error {
 	fmt.Println("Merging PR and cleaning up...")
-	
+
 	// Merge PR and delete remote branch
 	if err := mergePR(branch); err != nil {
 		return stacktrace.Propagate(err, "failed to merge PR")
 	}
-	
+
 	// Switch to main branch
 	if err := switchToMain(); err != nil {
 		return stacktrace.Propagate(err, "failed to switch to main branch")
 	}
-	
+
 	// Pull latest changes
 	if err := pullMain(); err != nil {
 		return stacktrace.Propagate(err, "failed to pull main branch")
 	}
-	
+
 	// Delete local branch
 	if err := deleteLocalBranch(branch); err != nil {
 		return stacktrace.Propagate(err, "failed to delete local branch")
 	}
-	
+
 	// Find the post directory that was added in this branch
 	postDir, err := getAddedPostDirectory(branch)
 	if err != nil {
 		return stacktrace.Propagate(err, "failed to find added post directory")
 	}
-	
+
 	// Open post in Chrome
 	if err := openPostInChrome(postDir); err != nil {
 		return stacktrace.Propagate(err, "failed to open post in Chrome")
 	}
-	
+
 	// Print Substack URL
 	substackURL := getSubstackURL()
 	fmt.Println("\nPaste the rendered Markdown output into:")
 	fmt.Println(substackURL)
-	
+
 	// Show tip if using placeholder URL
-	if substackURL == defaultSubstackURL {
-		fmt.Printf("\n💡 Tip: Create a %s file with %s=https://yourname.substack.com to get a working link.\n", envFilename, substackURLEnvVar)
+	if substackURL == DefaultSubstackURL {
+		fmt.Printf("\n💡 Tip: Create a %s file with %s=https://yourname.substack.com to get a working link.\n", EnvFilename, SubstackURLEnvVar)
 	}
-	
+
 	return nil
 }
 
@@ -343,13 +387,13 @@ func deleteLocalBranch(branch string) error {
 	if err != nil {
 		return stacktrace.NewError("failed to check if branch exists: %s", string(output))
 	}
-	
+
 	// If no output, branch doesn't exist
 	if strings.TrimSpace(string(output)) == "" {
 		fmt.Printf("Local branch '%s' already deleted\n", branch)
 		return nil
 	}
-	
+
 	// Branch exists, try to delete it
 	cmd = exec.Command("git", "branch", "-d", branch)
 	output, err = cmd.CombinedOutput()
@@ -367,7 +411,7 @@ func getAddedPostDirectory(branch string) (string, error) {
 	if err != nil {
 		return "", stacktrace.Propagate(err, "failed to get added files")
 	}
-	
+
 	var addedPostDirs []string
 	scanner := bufio.NewScanner(strings.NewReader(string(output)))
 	for scanner.Scan() {
@@ -380,15 +424,15 @@ func getAddedPostDirectory(branch string) (string, error) {
 			}
 		}
 	}
-	
+
 	if len(addedPostDirs) == 0 {
 		return "", stacktrace.NewError("no post.md files were added in this branch")
 	}
-	
+
 	if len(addedPostDirs) > 1 {
 		return "", stacktrace.NewError("multiple post.md files were added in this branch: %v", addedPostDirs)
 	}
-	
+
 	return addedPostDirs[0], nil
 }
 
