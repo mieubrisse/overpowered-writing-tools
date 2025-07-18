@@ -309,6 +309,12 @@ func getSubstackURL() string {
 func handleSuccessfulChecks(branch string) error {
 	fmt.Println("Merging PR and cleaning up...")
 
+	// Find the post directory that was added in this branch (before deleting branch)
+	postDir, err := getAddedPostDirectory()
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to find added post directory")
+	}
+
 	// Merge PR and delete remote branch
 	if err := mergePR(branch); err != nil {
 		return stacktrace.Propagate(err, "failed to merge PR")
@@ -327,12 +333,6 @@ func handleSuccessfulChecks(branch string) error {
 	// Delete local branch
 	if err := deleteLocalBranch(branch); err != nil {
 		return stacktrace.Propagate(err, "failed to delete local branch")
-	}
-
-	// Find the post directory that was added in this branch
-	postDir, err := getAddedPostDirectory()
-	if err != nil {
-		return stacktrace.Propagate(err, "failed to find added post directory")
 	}
 
 	// Open post in Chrome
