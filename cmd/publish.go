@@ -440,7 +440,20 @@ func getAddedPostDirectory() (string, error) {
 }
 
 func openPostInChrome(postDir string) error {
-	postPath := fmt.Sprintf("%s/post.md", postDir)
+	// Get current working directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		return stacktrace.Propagate(err, "failed to get current working directory")
+	}
+	
+	// Construct absolute path to post.md
+	postPath := filepath.Join(cwd, postDir, "post.md")
+	
+	// Check that the file exists before trying to open it
+	if _, err := os.Stat(postPath); os.IsNotExist(err) {
+		return stacktrace.NewError("failed to open post in Chrome: The file %s does not exist.", postPath)
+	}
+	
 	cmd := exec.Command("open", "-a", "Google Chrome", postPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
