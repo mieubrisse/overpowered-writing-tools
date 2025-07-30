@@ -94,7 +94,7 @@ func findPosts(cmd *cobra.Command, args []string) error {
 		return stacktrace.Propagate(err, "failed to sort entries by commit date")
 	}
 
-	// Filter entries based on search terms if provided
+	// Filter entries based on search terms if provided to check for single match
 	var filteredEntries []string
 	if searchTerms != "" {
 		filteredEntries, err = filterEntriesBySearchTerms(sortedEntries, searchTerms)
@@ -110,8 +110,8 @@ func findPosts(cmd *cobra.Command, args []string) error {
 	if len(filteredEntries) == 1 {
 		selection = filteredEntries[0]
 	} else {
-		// Launch fzf for selection
-		selection, err = runFzf(filteredEntries, searchTerms)
+		// Launch fzf for selection with ALL entries (let fzf handle the filtering)
+		selection, err = runFzf(sortedEntries, searchTerms)
 		if err != nil {
 			return stacktrace.Propagate(err, "fzf selection failed")
 		}
