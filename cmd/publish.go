@@ -440,14 +440,20 @@ func getAddedPostDirectory() (string, error) {
 }
 
 func openPostInChrome(postDir string) error {
-	// Get current working directory
-	cwd, err := os.Getwd()
+	// Get writing directory from environment variable
+	writingDir := os.Getenv(WritingDirEnvVar)
+	if writingDir == "" {
+		return stacktrace.NewError("writing directory not configured: %s environment variable not set", WritingDirEnvVar)
+	}
+	
+	// Convert to absolute path
+	absWritingDir, err := filepath.Abs(writingDir)
 	if err != nil {
-		return stacktrace.Propagate(err, "failed to get current working directory")
+		return stacktrace.Propagate(err, "failed to get absolute path for writing directory")
 	}
 	
 	// Construct absolute path to post.md
-	postPath := filepath.Join(cwd, postDir, "post.md")
+	postPath := filepath.Join(absWritingDir, postDir, "post.md")
 	
 	// Check that the file exists before trying to open it
 	if _, err := os.Stat(postPath); os.IsNotExist(err) {
