@@ -287,13 +287,22 @@ func validateWritingDirectory() error {
 }
 
 func getSubstackURL() string {
+	// Get home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return DefaultSubstackURL
+	}
+
+	// Construct path to env file in home directory
+	envFilePath := filepath.Join(homeDir, EnvFilename)
+
 	// Check if env file exists
-	if _, err := os.Stat(EnvFilename); os.IsNotExist(err) {
+	if _, err := os.Stat(envFilePath); os.IsNotExist(err) {
 		return DefaultSubstackURL
 	}
 
 	// Load env file using godotenv
-	envVars, err := godotenv.Read(EnvFilename)
+	envVars, err := godotenv.Read(envFilePath)
 	if err != nil {
 		return DefaultSubstackURL
 	}
@@ -347,7 +356,7 @@ func handleSuccessfulChecks(branch string) error {
 
 	// Show tip if using placeholder URL
 	if substackURL == DefaultSubstackURL {
-		fmt.Printf("\n💡 Tip: Create a %s file with %s=https://yourname.substack.com to get a working link.\n", EnvFilename, SubstackURLEnvVar)
+		fmt.Printf("\n💡 Tip: Create a ~/%s file with %s=https://yourname.substack.com to get a working link.\n", EnvFilename, SubstackURLEnvVar)
 	}
 
 	return nil
