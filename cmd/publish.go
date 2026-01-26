@@ -100,6 +100,11 @@ func publishPR(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Found existing PR: %s\n", prURL)
 	}
 
+	// Open PR in browser
+	if err := openPRInBrowser(prURL); err != nil {
+		return stacktrace.Propagate(err, "failed to open PR in browser")
+	}
+
 	// Monitor PR status
 	fmt.Println("Monitoring PR status...")
 	return monitorPRStatus(currentBranch)
@@ -446,6 +451,16 @@ func getAddedPostDirectory() (string, error) {
 	}
 
 	return addedPostDirs[0], nil
+}
+
+func openPRInBrowser(prURL string) error {
+	cmd := exec.Command("open", prURL)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return stacktrace.NewError("failed to open PR in browser: %s", string(output))
+	}
+	fmt.Printf("Opened PR in browser: %s\n", prURL)
+	return nil
 }
 
 func openPostInChrome(postDir string) error {
