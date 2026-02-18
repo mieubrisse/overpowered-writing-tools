@@ -57,9 +57,9 @@ Waits for checks to pass and can be interrupted at any time.`,
 }
 
 func publishPR(cmd *cobra.Command, args []string) error {
-	// Validate we're in the writing directory
-	if err := validateWritingDirectory(); err != nil {
-		return stacktrace.Propagate(err, "directory validation failed")
+	// Validate we're inside a Git repository
+	if err := validateGitRepository(); err != nil {
+		return stacktrace.Propagate(err, "git repository validation failed")
 	}
 
 	// Get current branch
@@ -253,41 +253,15 @@ func getPRStatus() (*PRBranch, error) {
 	return &statusResponse.CurrentBranch, nil
 }
 
-func validateWritingDirectory() error {
-	// Get current working directory
-	currentDir, err := os.Getwd()
+func validateGitRepository() error {
+	cmd := exec.Command("git", "rev-parse", "--is-inside-work-tree")
+	output, err := cmd.Output()
 	if err != nil {
-		return stacktrace.Propagate(err, "failed to get current working directory")
+		return stacktrace.NewError("must run publish command from within a Git repository")
 	}
-
-	// Get writing directory from environment variable
-	writingDir := os.Getenv(WritingDirEnvVar)
-	if writingDir == "" {
-		return stacktrace.NewError("writing directory not configured: %s environment variable not set", WritingDirEnvVar)
+	if strings.TrimSpace(string(output)) != "true" {
+		return stacktrace.NewError("must run publish command from within a Git repository")
 	}
-
-	// Convert to absolute paths for comparison
-	absWritingDir, err := filepath.Abs(writingDir)
-	if err != nil {
-		return stacktrace.Propagate(err, "failed to get absolute path for writing directory")
-	}
-
-	absCurrentDir, err := filepath.Abs(currentDir)
-	if err != nil {
-		return stacktrace.Propagate(err, "failed to get absolute path for current directory")
-	}
-
-	// Check if current directory is within writing directory
-	relPath, err := filepath.Rel(absWritingDir, absCurrentDir)
-	if err != nil {
-		return stacktrace.Propagate(err, "failed to calculate relative path")
-	}
-
-	// If relative path starts with "..", we're outside the writing directory
-	if strings.HasPrefix(relPath, "..") {
-		return stacktrace.NewError("must run publish command from within the writing directory (%s) or one of its subdirectories", absWritingDir)
-	}
-
 	return nil
 }
 
